@@ -1,4 +1,4 @@
-table 50100 "E-Pump Setup Table"
+table 52100 "E-Pump Setup Table"
 {
     Caption = 'E-Pump Setup';
     DataClassification = CustomerContent;

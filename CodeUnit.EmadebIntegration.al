@@ -1,8 +1,8 @@
-codeunit 50300 "E-Pump Mgt"
+codeunit 52102 "E-Pump Mgt"
 {
     procedure EPumpLogin(): Boolean
     var
-        EPumpSetup: Record "E-Pump Setup";
+        EPumpSetup: Record "E-Pump Setup Table";
         Client: HttpClient;
         RequestContent: HttpContent;
         ContentHeaders: HttpHeaders;
@@ -67,7 +67,7 @@ codeunit 50300 "E-Pump Mgt"
     // Call this before any other E-Pump request. It logs in again only when needed.
     procedure EnsureValidToken()
     var
-        EPumpSetup: Record "E-Pump Setup";
+        EPumpSetup: Record "E-Pump Setup Table";
     begin
         EPumpSetup.Get();
         if (EPumpSetup.Token = '') or (EPumpSetup."Token Expiry" < CurrentDateTime()) then

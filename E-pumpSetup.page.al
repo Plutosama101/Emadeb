@@ -1,4 +1,4 @@
-page 50150 "E-Pump Setup"
+page 52101 "E-Pump Setup"
 {
     PageType = Card;
     ApplicationArea = All;
