@@ -57,8 +57,13 @@ page 52101 "E-Pump Setup"
                 var
                     EPumpMgt: Codeunit "E-Pump Mgt";
                 begin
-                    if EPumpMgt.EPumpLogin() then
-                        Message('Login successful.');
+                    Rec.TestField("Base URL");
+                    Rec.TestField("Login URL");
+                    Rec.TestField("User Name");
+                    Rec.TestField(Password);
+
+                    EPumpMgt.Login(Rec);
+                    Message('Login successful.');
                 end;
             }
         }
