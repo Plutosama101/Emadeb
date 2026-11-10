@@ -37,9 +37,12 @@ codeunit 52102 "E-Pump Mgt"
         if not Response.IsSuccessStatusCode() then
             Error('E-Pump login failed (%1) calling %2: %3', Response.HttpStatusCode(), URL, ResponseBody);
 
-        // E-Pump answers with a list holding one login: [ { "token": ..., "refreshToken": ... } ]
-        ResponseArray.ReadFrom(ResponseBody);
-        ResponseArray.Get(0, Row);
+        // E-Pump sends back { "token": ... }. Swagger says it can be a list [ { "token": ... } ], so we accept both.
+        Row.ReadFrom(ResponseBody);
+        if Row.IsArray() then begin
+            ResponseArray := Row.AsArray();
+            ResponseArray.Get(0, Row);
+        end;
         ResponseJson := Row.AsObject();
 
         EPumpSetup.Token := GetText(ResponseJson, 'token');
