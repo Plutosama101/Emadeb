@@ -27,6 +27,8 @@ page 52132 "E-Pump Pump Sales"
                 field("Amount Sold"; Rec."Amount Sold") { }
                 field("RTT"; Rec."RTT") { }
                 field("Dealer Name"; Rec."Dealer Name") { }
+                field("Invoice Created"; Rec."Invoice Created") { }
+                field("Sales Document No."; Rec."Sales Document No.") { }
             }
         }
     }
@@ -35,6 +37,24 @@ page 52132 "E-Pump Pump Sales"
     {
         area(Processing)
         {
+            action(ConvertToSalesDocument)
+            {
+                Caption = 'Convert to Sales Document';
+                Image = MakeOrder;
+                ToolTip = 'Turns the rows shown (use filters first) into sales invoices or orders. One branch on one day = one document. Rows already converted are skipped.';
+
+                trigger OnAction()
+                var
+                    Rows: Record "E-Pump Pump Sale";
+                    Convert: Codeunit "E-Pump Sales Convert";
+                begin
+                    if not Confirm('Convert the rows shown into sales documents?') then
+                        exit;
+                    Rows.CopyFilters(Rec); // the same rows you see on the page
+                    Convert.ConvertPumpSales(Rows);
+                    CurrPage.Update(false);
+                end;
+            }
             action(FetchBranchSales)
             {
                 Caption = 'Sales for a Branch';

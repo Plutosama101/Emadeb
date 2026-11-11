@@ -31,6 +31,20 @@ page 52101 "E-Pump Setup"
                 field("User Name"; Rec."User Name") { ApplicationArea = All; }
                 field(Password; Rec.Password) { ApplicationArea = All; }
             }
+            group(Sales)
+            {
+                Caption = 'Sales Documents';
+                field("Create Sales As"; Rec."Create Sales As")
+                {
+                    ApplicationArea = All;
+                    ToolTip = 'What "Convert to Sales Document" creates: a Sales Invoice or a Sales Order.';
+                }
+                field("Auto-Post"; Rec."Auto-Post")
+                {
+                    ApplicationArea = All;
+                    ToolTip = 'Post each sales document straight after it is created.';
+                }
+            }
             group(TokenInfo)
             {
                 Caption = 'Token';

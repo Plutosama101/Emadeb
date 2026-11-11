@@ -28,6 +28,9 @@ table 52111 "E-Pump Branch"
         field(19; "Latitude"; Decimal) { }
         field(20; "Longitude"; Decimal) { }
         field(21; "Date"; DateTime) { }
+
+        // Set in Business Central, never by E-Pump. Used to find the customer when converting sales.
+        field(50; "Location Code"; Code[10]) { TableRelation = Location; }
     }
 
     keys

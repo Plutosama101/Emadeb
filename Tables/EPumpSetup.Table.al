@@ -15,6 +15,8 @@ table 52100 "E-Pump Setup Table"
         field(8; "Refresh Token"; Text[250]) { }
         field(9; "Token Expiry"; DateTime) { }
         field(10; "Last Login"; DateTime) { }
+        field(11; "Create Sales As"; Enum "E-Pump Sales Doc Type") { }
+        field(12; "Auto-Post"; Boolean) { }
     }
 
     keys

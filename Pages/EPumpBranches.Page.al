@@ -5,7 +5,7 @@ page 52131 "E-Pump Branches"
     ApplicationArea = All;
     UsageCategory = Lists;
     SourceTable = "E-Pump Branch";
-    Editable = false;
+    InsertAllowed = false;
 
     layout
     {
@@ -13,27 +13,29 @@ page 52131 "E-Pump Branches"
         {
             repeater(Rows)
             {
-                field("Branch Id"; Rec."Branch Id") { }
-                field("Name"; Rec."Name") { }
-                field("Company Id"; Rec."Company Id") { }
-                field("Company Name"; Rec."Company Name") { }
-                field("Phone"; Rec."Phone") { }
-                field("Email"; Rec."Email") { }
-                field("Street"; Rec."Street") { }
-                field("City"; Rec."City") { }
-                field("LGA"; Rec."LGA") { }
-                field("State"; Rec."State") { }
-                field("Country"; Rec."Country") { }
-                field("Full Address"; Rec."Full Address") { }
-                field("Group Id"; Rec."Group Id") { }
-                field("Group Name"; Rec."Group Name") { }
-                field("Region Id"; Rec."Region Id") { }
-                field("Region Name"; Rec."Region Name") { }
-                field("Branch Status"; Rec."Branch Status") { }
-                field("Type"; Rec."Type") { }
-                field("Latitude"; Rec."Latitude") { }
-                field("Longitude"; Rec."Longitude") { }
-                field("Date"; Rec."Date") { }
+                field("Branch Id"; Rec."Branch Id") { Editable = false; }
+                field("Name"; Rec."Name") { Editable = false; }
+                // The only field you fill in: the BC location for this branch
+                field("Location Code"; Rec."Location Code") { }
+                field("Company Id"; Rec."Company Id") { Editable = false; }
+                field("Company Name"; Rec."Company Name") { Editable = false; }
+                field("Phone"; Rec."Phone") { Editable = false; }
+                field("Email"; Rec."Email") { Editable = false; }
+                field("Street"; Rec."Street") { Editable = false; }
+                field("City"; Rec."City") { Editable = false; }
+                field("LGA"; Rec."LGA") { Editable = false; }
+                field("State"; Rec."State") { Editable = false; }
+                field("Country"; Rec."Country") { Editable = false; }
+                field("Full Address"; Rec."Full Address") { Editable = false; }
+                field("Group Id"; Rec."Group Id") { Editable = false; }
+                field("Group Name"; Rec."Group Name") { Editable = false; }
+                field("Region Id"; Rec."Region Id") { Editable = false; }
+                field("Region Name"; Rec."Region Name") { Editable = false; }
+                field("Branch Status"; Rec."Branch Status") { Editable = false; }
+                field("Type"; Rec."Type") { Editable = false; }
+                field("Latitude"; Rec."Latitude") { Editable = false; }
+                field("Longitude"; Rec."Longitude") { Editable = false; }
+                field("Date"; Rec."Date") { Editable = false; }
             }
         }
     }
@@ -42,6 +44,14 @@ page 52131 "E-Pump Branches"
     {
         area(Processing)
         {
+            action(Pumps)
+            {
+                Caption = 'Pumps';
+                Image = Line;
+                ToolTip = 'Shows the pumps of the selected branch.';
+                RunObject = page "E-Pump Branch Pumps";
+                RunPageLink = "Branch Id" = field("Branch Id");
+            }
             action(FetchMyBranches)
             {
                 Caption = 'Fetch My Branches';

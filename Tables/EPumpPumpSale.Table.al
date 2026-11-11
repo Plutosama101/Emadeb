@@ -21,10 +21,15 @@ table 52112 "E-Pump Pump Sale"
         field(12; "Amount Sold"; Decimal) { }
         field(13; "RTT"; Decimal) { }
         field(14; "Dealer Name"; Text[250]) { }
+
+        // Set by "Convert to Sales Document", never by E-Pump
+        field(50; "Invoice Created"; Boolean) { Editable = false; }
+        field(51; "Sales Document No."; Code[20]) { Editable = false; }
     }
 
     keys
     {
         key(PK; "Sale Id") { Clustered = true; }
+        key(BranchDate; "Branch Id", "Date") { }
     }
 }

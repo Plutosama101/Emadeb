@@ -30,6 +30,8 @@ page 52133 "E-Pump Transactions"
                 field("Sales Type"; Rec."Sales Type") { }
                 field("Voucher Card Number"; Rec."Voucher Card Number") { }
                 field("Transaction Time"; Rec."Transaction Time") { }
+                field("Invoice Created"; Rec."Invoice Created") { }
+                field("Sales Document No."; Rec."Sales Document No.") { }
             }
         }
     }
@@ -38,6 +40,24 @@ page 52133 "E-Pump Transactions"
     {
         area(Processing)
         {
+            action(ConvertToSalesDocument)
+            {
+                Caption = 'Convert to Sales Document';
+                Image = MakeOrder;
+                ToolTip = 'Turns the rows shown (use filters first) into sales invoices or orders. One branch on one day = one document. Rows already converted are skipped.';
+
+                trigger OnAction()
+                var
+                    Rows: Record "E-Pump Transaction";
+                    Convert: Codeunit "E-Pump Sales Convert";
+                begin
+                    if not Confirm('Convert the rows shown into sales documents?') then
+                        exit;
+                    Rows.CopyFilters(Rec); // the same rows you see on the page
+                    Convert.ConvertTransactions(Rows);
+                    CurrPage.Update(false);
+                end;
+            }
             action(FetchBranchTransactions)
             {
                 Caption = 'Transactions for a Branch';

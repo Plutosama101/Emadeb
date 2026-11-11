@@ -98,6 +98,66 @@ codeunit 52103 "E-Pump Fetch"
         exit(Rows.Count());
     end;
 
+    // ================= Pumps =================
+
+    procedure BranchPumps(BranchId: Text): Integer
+    var
+        Pump: Record "E-Pump Branch Pump";
+        Mapping: Record "E-Pump Product Mapping";
+        Rows: JsonArray;
+        Row: JsonToken;
+        R: JsonObject;
+        AlreadyThere: Boolean;
+    begin
+        Rows := EPumpMgt.GetArray('/Branch/Pumps/' + BranchId);
+        foreach Row in Rows do begin
+            R := Row.AsObject();
+            // Load the pump if we have it, so the Item No. set in BC is kept
+            AlreadyThere := Pump.Get(EPumpMgt.GetText(R, 'id'));
+            if not AlreadyThere then begin
+                Pump.Init();
+                Pump."Pump Id" := EPumpMgt.GetText(R, 'id');
+            end;
+            Pump.Name := EPumpMgt.GetText(R, 'displayName');
+            Pump."Branch Id" := EPumpMgt.GetText(R, 'branchId');
+            Pump."Product Name" := EPumpMgt.GetText(R, 'productName');
+            Pump."Tank Name" := EPumpMgt.GetText(R, 'tankName');
+            Pump.Status := EPumpMgt.GetText(R, 'status');
+            Pump."Selling Price" := EPumpMgt.GetDecimal(R, 'sellingPrice');
+            Pump."Opening Reading" := EPumpMgt.GetDecimal(R, 'openingReading');
+            Pump."Current Reading" := EPumpMgt.GetDecimal(R, 'currentReading');
+            Pump."Manual Opening Reading" := EPumpMgt.GetDecimal(R, 'manualOpeningReading');
+            Pump."Manual Closing Reading" := EPumpMgt.GetDecimal(R, 'manualClosingReading');
+            Pump.Manufacturer := EPumpMgt.GetText(R, 'manufacturer');
+            Pump.Model := EPumpMgt.GetText(R, 'model');
+            Pump."Pump Address" := EPumpMgt.GetInteger(R, 'pumpAddress');
+            Pump."Device Id" := EPumpMgt.GetText(R, 'deviceId');
+            Pump."Last Update" := EPumpMgt.GetDateTime(R, 'lastUpdate');
+            Pump."Date Created" := EPumpMgt.GetDateTime(R, 'dateCreated');
+
+            // A pump without an item gets one from the Product Mappings (if there is one)
+            if Pump."Item No." = '' then
+                Pump."Item No." := Mapping.ItemFor(Pump."Product Name");
+
+            if AlreadyThere then
+                Pump.Modify()
+            else
+                Pump.Insert();
+        end;
+        exit(Rows.Count());
+    end;
+
+    // Fetches pumps for every branch on the E-Pump Branches page
+    procedure AllBranchPumps() Total: Integer
+    var
+        Branch: Record "E-Pump Branch";
+    begin
+        if Branch.FindSet() then
+            repeat
+                Total += BranchPumps(Branch."Branch Id");
+            until Branch.Next() = 0;
+    end;
+
     // ================= Pump sales (all of these send back the same kind of row) =================
 
     procedure BranchSales(BranchId: Text; StartDate: Date; EndDate: Date): Integer
@@ -160,11 +220,16 @@ codeunit 52103 "E-Pump Fetch"
         Sale: Record "E-Pump Pump Sale";
         Row: JsonToken;
         R: JsonObject;
+        AlreadyThere: Boolean;
     begin
         foreach Row in Rows do begin
             R := Row.AsObject();
-            Sale.Init();
-            Sale."Sale Id" := EPumpMgt.GetText(R, 'id');
+            // Load the row if we have it, so "Invoice Created" is not wiped
+            AlreadyThere := Sale.Get(EPumpMgt.GetText(R, 'id'));
+            if not AlreadyThere then begin
+                Sale.Init();
+                Sale."Sale Id" := EPumpMgt.GetText(R, 'id');
+            end;
             Sale.Date := EPumpMgt.GetDateTime(R, 'date');
             Sale."Branch Id" := EPumpMgt.GetText(R, 'branchId');
             Sale."Branch Name" := EPumpMgt.GetText(R, 'branchName');
@@ -178,8 +243,10 @@ codeunit 52103 "E-Pump Fetch"
             Sale."Amount Sold" := EPumpMgt.GetDecimal(R, 'amountSold');
             Sale.RTT := EPumpMgt.GetDecimal(R, 'rtt');
             Sale."Dealer Name" := EPumpMgt.GetText(R, 'dealerName');
-            if not Sale.Insert() then
-                Sale.Modify();
+            if AlreadyThere then
+                Sale.Modify()
+            else
+                Sale.Insert();
         end;
         exit(Rows.Count());
     end;
@@ -201,11 +268,16 @@ codeunit 52103 "E-Pump Fetch"
         Trans: Record "E-Pump Transaction";
         Row: JsonToken;
         R: JsonObject;
+        AlreadyThere: Boolean;
     begin
         foreach Row in Rows do begin
             R := Row.AsObject();
-            Trans.Init();
-            Trans."Transaction Id" := EPumpMgt.GetText(R, 'id');
+            // Load the row if we have it, so "Invoice Created" is not wiped
+            AlreadyThere := Trans.Get(EPumpMgt.GetText(R, 'id'));
+            if not AlreadyThere then begin
+                Trans.Init();
+                Trans."Transaction Id" := EPumpMgt.GetText(R, 'id');
+            end;
             Trans.Date := EPumpMgt.GetDateTime(R, 'date');
             Trans."Branch Id" := EPumpMgt.GetText(R, 'branchId');
             Trans."Branch Name" := EPumpMgt.GetText(R, 'branchName');
@@ -222,8 +294,10 @@ codeunit 52103 "E-Pump Fetch"
             Trans."Sales Type" := EPumpMgt.GetText(R, 'salesType');
             Trans."Voucher Card Number" := EPumpMgt.GetText(R, 'voucherCardNumber');
             Trans."Transaction Time" := EPumpMgt.GetInteger(R, 'transactionTime');
-            if not Trans.Insert() then
-                Trans.Modify();
+            if AlreadyThere then
+                Trans.Modify()
+            else
+                Trans.Insert();
         end;
         exit(Rows.Count());
     end;

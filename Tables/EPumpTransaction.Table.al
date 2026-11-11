@@ -24,10 +24,15 @@ table 52113 "E-Pump Transaction"
         field(15; "Sales Type"; Text[250]) { }
         field(16; "Voucher Card Number"; Text[250]) { }
         field(17; "Transaction Time"; Integer) { }
+
+        // Set by "Convert to Sales Document", never by E-Pump
+        field(50; "Invoice Created"; Boolean) { Editable = false; }
+        field(51; "Sales Document No."; Code[20]) { Editable = false; }
     }
 
     keys
     {
         key(PK; "Transaction Id") { Clustered = true; }
+        key(BranchDate; "Branch Id", "Date") { }
     }
 }
