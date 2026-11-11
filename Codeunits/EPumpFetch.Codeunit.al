@@ -162,33 +162,33 @@ codeunit 52103 "E-Pump Fetch"
 
     procedure BranchSales(BranchId: Text; StartDate: Date; EndDate: Date): Integer
     begin
-        exit(SavePumpSales(EPumpMgt.GetArray('/Branch/Sales/' + BranchId + EPumpMgt.DateRange(StartDate, EndDate))));
+        exit(SavePumpSales(EPumpMgt.GetArray('/Branch/Sales/' + BranchId + EPumpMgt.DateRange(StartDate, EndDate)), BranchId));
     end;
 
     procedure BranchSalesV2(BranchId: Text; StartDate: Date; EndDate: Date): Integer
     begin
-        exit(SavePumpSales(EPumpMgt.GetArray('/Branch/Salesv2/' + BranchId + EPumpMgt.DateRange(StartDate, EndDate))));
+        exit(SavePumpSales(EPumpMgt.GetArray('/Branch/Salesv2/' + BranchId + EPumpMgt.DateRange(StartDate, EndDate)), BranchId));
     end;
 
     procedure DaySale(BranchId: Text; StartDate: Date; EndDate: Date): Integer
     begin
-        exit(SavePumpSales(EPumpMgt.GetArray('/Branch/DaySale/' + BranchId + EPumpMgt.DateRange(StartDate, EndDate))));
+        exit(SavePumpSales(EPumpMgt.GetArray('/Branch/DaySale/' + BranchId + EPumpMgt.DateRange(StartDate, EndDate)), BranchId));
     end;
 
     procedure CompanySales(CompanyId: Text; StartDate: Date; EndDate: Date): Integer
     begin
-        exit(SavePumpSales(EPumpMgt.GetArray('/Company/BranchSales/' + CompanyId + EPumpMgt.DateRange(StartDate, EndDate))));
+        exit(SavePumpSales(EPumpMgt.GetArray('/Company/BranchSales/' + CompanyId + EPumpMgt.DateRange(StartDate, EndDate)), ''));
     end;
 
     procedure CompanySalesSummary(CompanyId: Text; StartDate: Date; EndDate: Date): Integer
     begin
-        exit(SavePumpSales(EPumpMgt.GetArray('/Company/BranchSales/Summary/' + CompanyId + EPumpMgt.DateRange(StartDate, EndDate))));
+        exit(SavePumpSales(EPumpMgt.GetArray('/Company/BranchSales/Summary/' + CompanyId + EPumpMgt.DateRange(StartDate, EndDate)), ''));
     end;
 
     procedure CompanyBranchSales(CompanyId: Text; StartDate: Date; EndDate: Date): Integer
     begin
         // This endpoint takes the dates in the path, not after a '?'
-        exit(SavePumpSales(EPumpMgt.GetArray('/Company/CompanyBranchSales/' + CompanyId + '/' + Format(StartDate, 0, 9) + '/' + Format(EndDate, 0, 9))));
+        exit(SavePumpSales(EPumpMgt.GetArray('/Company/CompanyBranchSales/' + CompanyId + '/' + Format(StartDate, 0, 9) + '/' + Format(EndDate, 0, 9)), ''));
     end;
 
     procedure PriceChanges(CompanyId: Text; BranchId: Text; State: Text; StartDate: Date; EndDate: Date): Integer
@@ -200,7 +200,7 @@ codeunit 52103 "E-Pump Fetch"
             Path += '&branchId=' + BranchId;
         if State <> '' then
             Path += '&state=' + Encode(State);
-        exit(SavePumpSales(EPumpMgt.GetArray(Path)));
+        exit(SavePumpSales(EPumpMgt.GetArray(Path), BranchId));
     end;
 
     procedure ProductPrices(CompanyId: Text; BranchId: Text; State: Text): Integer
@@ -212,10 +212,10 @@ codeunit 52103 "E-Pump Fetch"
             Path += '&branchId=' + BranchId;
         if State <> '' then
             Path += '&state=' + Encode(State);
-        exit(SavePumpSales(EPumpMgt.GetArray(Path)));
+        exit(SavePumpSales(EPumpMgt.GetArray(Path), BranchId));
     end;
 
-    local procedure SavePumpSales(Rows: JsonArray): Integer
+    local procedure SavePumpSales(Rows: JsonArray; AskedBranchId: Text): Integer
     var
         Sale: Record "E-Pump Pump Sale";
         Row: JsonToken;
@@ -231,7 +231,7 @@ codeunit 52103 "E-Pump Fetch"
                 Sale."Sale Id" := EPumpMgt.GetText(R, 'id');
             end;
             Sale.Date := EPumpMgt.GetDateTime(R, 'date');
-            Sale."Branch Id" := EPumpMgt.GetText(R, 'branchId');
+            Sale."Branch Id" := BranchIdOf(R, AskedBranchId);
             Sale."Branch Name" := EPumpMgt.GetText(R, 'branchName');
             Sale."Pump Id" := EPumpMgt.GetText(R, 'pumpId');
             Sale."Pump Name" := EPumpMgt.GetText(R, 'pumpName');
@@ -251,19 +251,36 @@ codeunit 52103 "E-Pump Fetch"
         exit(Rows.Count());
     end;
 
+    // E-Pump sometimes sends a sale without its branch id. Then we use:
+    //   1. the branch we asked for (when fetching for one branch), or
+    //   2. the branch on the E-Pump Branches page with the same name.
+    local procedure BranchIdOf(R: JsonObject; AskedBranchId: Text): Text
+    var
+        Branch: Record "E-Pump Branch";
+    begin
+        if EPumpMgt.GetText(R, 'branchId') <> '' then
+            exit(EPumpMgt.GetText(R, 'branchId'));
+        if AskedBranchId <> '' then
+            exit(AskedBranchId);
+        Branch.SetRange(Name, EPumpMgt.GetText(R, 'branchName'));
+        if Branch.FindFirst() then
+            exit(Branch."Branch Id");
+        exit('');
+    end;
+
     // ================= Transactions =================
 
     procedure BranchTransactions(BranchId: Text; StartDate: Date; EndDate: Date): Integer
     begin
-        exit(SaveTransactions(EPumpMgt.GetArray('/Branch/Transactions/' + BranchId + EPumpMgt.DateRange(StartDate, EndDate))));
+        exit(SaveTransactions(EPumpMgt.GetArray('/Branch/Transactions/' + BranchId + EPumpMgt.DateRange(StartDate, EndDate)), BranchId));
     end;
 
     procedure CompanyTransactions(CompanyId: Text; OnDate: Date): Integer
     begin
-        exit(SaveTransactions(EPumpMgt.GetArray('/Company/BranchTransactions/' + CompanyId + '?date=' + Format(OnDate, 0, 9))));
+        exit(SaveTransactions(EPumpMgt.GetArray('/Company/BranchTransactions/' + CompanyId + '?date=' + Format(OnDate, 0, 9)), ''));
     end;
 
-    local procedure SaveTransactions(Rows: JsonArray): Integer
+    local procedure SaveTransactions(Rows: JsonArray; AskedBranchId: Text): Integer
     var
         Trans: Record "E-Pump Transaction";
         Row: JsonToken;
@@ -279,7 +296,7 @@ codeunit 52103 "E-Pump Fetch"
                 Trans."Transaction Id" := EPumpMgt.GetText(R, 'id');
             end;
             Trans.Date := EPumpMgt.GetDateTime(R, 'date');
-            Trans."Branch Id" := EPumpMgt.GetText(R, 'branchId');
+            Trans."Branch Id" := BranchIdOf(R, AskedBranchId);
             Trans."Branch Name" := EPumpMgt.GetText(R, 'branchName');
             Trans."Pump Id" := EPumpMgt.GetText(R, 'pumpId');
             Trans."Pump Name" := EPumpMgt.GetText(R, 'pumpName');

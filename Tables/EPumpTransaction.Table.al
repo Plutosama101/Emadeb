@@ -26,7 +26,7 @@ table 52113 "E-Pump Transaction"
         field(17; "Transaction Time"; Integer) { }
 
         // Set by "Convert to Sales Document", never by E-Pump
-        field(50; "Invoice Created"; Boolean) { Editable = false; }
+        field(50; z"Invoice Created"; Boolean) { Editable = false; }
         field(51; "Sales Document No."; Code[20]) { Editable = false; }
     }
 

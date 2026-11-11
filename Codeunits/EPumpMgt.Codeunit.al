@@ -118,6 +118,9 @@ codeunit 52102 "E-Pump Mgt"
     begin
         if not FindValue(Row, FieldName, Value) then
             exit('');
+        // E-Pump sends this "all zeros" id when there is no id, so treat it as blank
+        if Value.AsValue().AsText() = '00000000-0000-0000-0000-000000000000' then
+            exit('');
         exit(Value.AsValue().AsText());
     end;
 

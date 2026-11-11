@@ -105,6 +105,8 @@ codeunit 52104 "E-Pump Sales Convert"
         Branch: Record "E-Pump Branch";
         Location: Record Location;
     begin
+        if BranchId = '' then
+            Error('Some rows have no Branch Id because E-Pump did not send one. Filter on an empty Branch Id to see them, then fetch them again with "Transactions for a Branch".');
         if not Branch.Get(BranchId) then
             Error('Branch %1 is not on the E-Pump Branches page. Fetch branches first.', BranchId);
         if Branch."Location Code" = '' then
