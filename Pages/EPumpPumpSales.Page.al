@@ -37,22 +37,40 @@ page 52132 "E-Pump Pump Sales"
     {
         area(Processing)
         {
-            action(ConvertToSalesDocument)
+            action(ConvertSelected)
             {
-                Caption = 'Convert to Sales Document';
+                Caption = 'Convert Selected to Sales Document';
                 Image = MakeOrder;
-                ToolTip = 'Turns the rows shown (use filters first) into sales invoices or orders. One branch on one day = one document. Rows already converted are skipped.';
+                ToolTip = 'Converts the row(s) you selected. Select one row, or several with Ctrl/Shift. Same pump + same day = one summed line.';
 
                 trigger OnAction()
                 var
                     Rows: Record "E-Pump Pump Sale";
                     Convert: Codeunit "E-Pump Sales Convert";
                 begin
-                    if not Confirm('Convert the rows shown into sales documents?') then
+                    CurrPage.SetSelectionFilter(Rows); // only the selected rows
+                    if not Confirm('Convert the %1 selected row(s) into sales documents?', true, Rows.Count()) then
                         exit;
-                    Rows.CopyFilters(Rec); // the same rows you see on the page
                     Convert.ConvertPumpSales(Rows);
-                    CurrPage.Update(false);
+                    CurrPage.Update(false); // show the new "Invoice Created" ticks
+                end;
+            }
+            action(ConvertAllShown)
+            {
+                Caption = 'Convert All Shown to Sales Document';
+                Image = MakeOrder;
+                ToolTip = 'Converts every row the page shows (use filters first). One branch on one day = one document. Same pump + same day = one summed line. Rows already converted are skipped.';
+
+                trigger OnAction()
+                var
+                    Rows: Record "E-Pump Pump Sale";
+                    Convert: Codeunit "E-Pump Sales Convert";
+                begin
+                    Rows.CopyFilters(Rec); // the same rows you see on the page
+                    if not Confirm('Convert all %1 row(s) shown into sales documents?', true, Rows.Count()) then
+                        exit;
+                    Convert.ConvertPumpSales(Rows);
+                    CurrPage.Update(false); // show the new "Invoice Created" ticks
                 end;
             }
             action(FetchBranchSales)

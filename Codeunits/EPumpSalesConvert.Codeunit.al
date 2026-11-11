@@ -1,100 +1,141 @@
 // "Convert to Sales Document": turns E-Pump sales into Business Central sales invoices or orders.
 //
 //   - Only rows that are not converted yet are used.
-//   - One branch on one day = one sales document, with one line per sale.
+//   - One branch on one day = one sales document.
+//   - Sales from the same pump at the same price on that day are added together into ONE line.
+//     (If the price changed during the day, that pump gets one line per price.)
 //   - Customer: Branch -> its Location Code -> the E-Pump Customer No. on that Location Card.
 //   - Item:     the pump's Item No., or the Product Mapping when the pump has none.
+//   - Every converted row gets "Invoice Created" ticked and the Sales Document No.
 //
 // Step 1 checks every row first. If anything is missing it stops with a message
 // and nothing is created. Step 2 creates the documents.
+//
+// Both pages (Transactions and Pump Sales) copy their rows into the same temporary
+// list ("Buffer"), so the converting is written only once, in ConvertBuffer.
 codeunit 52104 "E-Pump Sales Convert"
 {
     // ---------- From the E-Pump Transactions page ----------
 
     procedure ConvertTransactions(var Trans: Record "E-Pump Transaction")
     var
+        Buffer: Record "E-Pump Transaction" temporary;
         Done: Record "E-Pump Transaction";
-        SalesHeader: Record "Sales Header";
+        DocNoFor: Dictionary of [Text, Code[20]];
         CreatedDocs: List of [Code[20]];
-        LastBranch: Text;
-        LastDay: Date;
+        RowId: Text;
     begin
         Trans.SetRange("Invoice Created", false);
-        Trans.SetCurrentKey("Branch Id", "Date");
         if Trans.IsEmpty() then
-            Error('There is nothing to convert. All rows shown are already converted.');
+            Error('There is nothing to convert. The rows you chose are already converted.');
 
-        // Step 1: check
         Trans.FindSet();
         repeat
-            CustomerFor(Trans."Branch Id");
-            ItemFor(Trans."Pump Id", Trans."Product Name");
+            Buffer := Trans;
+            Buffer.Insert();
         until Trans.Next() = 0;
 
-        // Step 2: create
-        Trans.FindSet();
-        repeat
-            if (Trans."Branch Id" <> LastBranch) or (DT2Date(Trans.Date) <> LastDay) then begin
-                CreateHeader(SalesHeader, Trans."Branch Id", DT2Date(Trans.Date));
-                CreatedDocs.Add(SalesHeader."No.");
-                LastBranch := Trans."Branch Id";
-                LastDay := DT2Date(Trans.Date);
-            end;
-            AddLine(SalesHeader, ItemFor(Trans."Pump Id", Trans."Product Name"), Trans."Vol Sold", Trans.Price,
-                Trans."Pump Name" + ' ' + Format(Trans.Date));
+        ConvertBuffer(Buffer, DocNoFor, CreatedDocs);
 
-            // Mark it through a copy: changing the filtered field on Trans itself would upset the loop
-            Done := Trans;
+        // Tick "Invoice Created" on every row that went into a document
+        foreach RowId in DocNoFor.Keys() do begin
+            Done.Get(RowId);
             Done."Invoice Created" := true;
-            Done."Sales Document No." := SalesHeader."No.";
+            Done."Sales Document No." := DocNoFor.Get(RowId);
             Done.Modify();
-        until Trans.Next() = 0;
+        end;
 
-        Finish(CreatedDocs);
+        Finish(CreatedDocs, DocNoFor.Count());
     end;
 
     // ---------- From the E-Pump Pump Sales page ----------
 
     procedure ConvertPumpSales(var Sale: Record "E-Pump Pump Sale")
     var
+        Buffer: Record "E-Pump Transaction" temporary;
         Done: Record "E-Pump Pump Sale";
-        SalesHeader: Record "Sales Header";
+        DocNoFor: Dictionary of [Text, Code[20]];
         CreatedDocs: List of [Code[20]];
-        LastBranch: Text;
-        LastDay: Date;
+        RowId: Text;
     begin
         Sale.SetRange("Invoice Created", false);
-        Sale.SetCurrentKey("Branch Id", "Date");
         if Sale.IsEmpty() then
-            Error('There is nothing to convert. All rows shown are already converted.');
+            Error('There is nothing to convert. The rows you chose are already converted.');
 
-        // Step 1: check
+        // Copy each pump sale into the same shape as a transaction
         Sale.FindSet();
         repeat
-            CustomerFor(Sale."Branch Id");
-            ItemFor(Sale."Pump Id", Sale."Product Name");
+            Buffer.Init();
+            Buffer."Transaction Id" := Sale."Sale Id";
+            Buffer."Branch Id" := Sale."Branch Id";
+            Buffer.Date := Sale.Date;
+            Buffer."Pump Id" := Sale."Pump Id";
+            Buffer."Pump Name" := Sale."Pump Name";
+            Buffer."Product Name" := Sale."Product Name";
+            Buffer."Vol Sold" := Sale."Volume Sold";
+            Buffer.Price := Sale.Price;
+            Buffer.Insert();
         until Sale.Next() = 0;
 
-        // Step 2: create
-        Sale.FindSet();
-        repeat
-            if (Sale."Branch Id" <> LastBranch) or (DT2Date(Sale.Date) <> LastDay) then begin
-                CreateHeader(SalesHeader, Sale."Branch Id", DT2Date(Sale.Date));
-                CreatedDocs.Add(SalesHeader."No.");
-                LastBranch := Sale."Branch Id";
-                LastDay := DT2Date(Sale.Date);
-            end;
-            AddLine(SalesHeader, ItemFor(Sale."Pump Id", Sale."Product Name"), Sale."Volume Sold", Sale.Price,
-                Sale."Pump Name" + ' ' + Format(Sale.Date));
+        ConvertBuffer(Buffer, DocNoFor, CreatedDocs);
 
-            // Mark it through a copy: changing the filtered field on Sale itself would upset the loop
-            Done := Sale;
+        foreach RowId in DocNoFor.Keys() do begin
+            Done.Get(RowId);
             Done."Invoice Created" := true;
-            Done."Sales Document No." := SalesHeader."No.";
+            Done."Sales Document No." := DocNoFor.Get(RowId);
             Done.Modify();
-        until Sale.Next() = 0;
+        end;
 
-        Finish(CreatedDocs);
+        Finish(CreatedDocs, DocNoFor.Count());
+    end;
+
+    // ---------- The converting itself ----------
+
+    // DocNoFor:    which sales document each row went into (row id -> document no.)
+    // CreatedDocs: the new sales documents
+    local procedure ConvertBuffer(var Buffer: Record "E-Pump Transaction" temporary; var DocNoFor: Dictionary of [Text, Code[20]]; var CreatedDocs: List of [Code[20]])
+    var
+        SalesHeader: Record "Sales Header";
+        SalesLine: Record "Sales Line";
+        LineFor: Dictionary of [Text, Integer];
+        LastBranch: Text;
+        LastDay: Date;
+        PumpAndPrice: Text;
+        LineNo: Integer;
+    begin
+        // Step 1: check every row. Stops with a message before anything is created.
+        Buffer.FindSet();
+        repeat
+            CustomerFor(Buffer."Branch Id");
+            ItemFor(Buffer."Pump Id", Buffer."Product Name");
+        until Buffer.Next() = 0;
+
+        // Step 2: create. Sorted by branch and date, so each branch-day comes together.
+        Buffer.SetCurrentKey("Branch Id", "Date");
+        Buffer.FindSet();
+        repeat
+            // New branch or new day -> new sales document
+            if (Buffer."Branch Id" <> LastBranch) or (DT2Date(Buffer.Date) <> LastDay) then begin
+                CreateHeader(SalesHeader, Buffer."Branch Id", DT2Date(Buffer.Date));
+                CreatedDocs.Add(SalesHeader."No.");
+                Clear(LineFor); // line list starts empty for each new document
+                LastBranch := Buffer."Branch Id";
+                LastDay := DT2Date(Buffer.Date);
+            end;
+
+            // Same pump at the same price already has a line on this document -> add the litres to it
+            PumpAndPrice := Buffer."Pump Id" + '|' + Format(Buffer.Price);
+            if LineFor.Get(PumpAndPrice, LineNo) then begin
+                SalesLine.Get(SalesHeader."Document Type", SalesHeader."No.", LineNo);
+                SalesLine.Validate(Quantity, SalesLine.Quantity + Buffer."Vol Sold");
+                SalesLine.Modify(true);
+            end else begin
+                LineNo := AddLine(SalesHeader, ItemFor(Buffer."Pump Id", Buffer."Product Name"), Buffer."Vol Sold", Buffer.Price, Buffer."Pump Name");
+                LineFor.Add(PumpAndPrice, LineNo);
+            end;
+
+            DocNoFor.Add(Buffer."Transaction Id", SalesHeader."No.");
+        until Buffer.Next() = 0;
     end;
 
     // ---------- Shared steps ----------
@@ -155,7 +196,8 @@ codeunit 52104 "E-Pump Sales Convert"
         SalesHeader.Modify(true);
     end;
 
-    local procedure AddLine(SalesHeader: Record "Sales Header"; ItemNo: Code[20]; Quantity: Decimal; UnitPrice: Decimal; Note: Text)
+    // Adds one sales line and gives back its Line No.
+    local procedure AddLine(SalesHeader: Record "Sales Header"; ItemNo: Code[20]; Quantity: Decimal; UnitPrice: Decimal; PumpName: Text): Integer
     var
         SalesLine: Record "Sales Line";
         LastLine: Record "Sales Line";
@@ -176,12 +218,13 @@ codeunit 52104 "E-Pump Sales Convert"
         SalesLine.Validate("Location Code", SalesHeader."Location Code");
         SalesLine.Validate(Quantity, Quantity);
         SalesLine.Validate("Unit Price", UnitPrice);
-        SalesLine."Description 2" := CopyStr(Note, 1, MaxStrLen(SalesLine."Description 2"));
+        SalesLine."Description 2" := CopyStr('Pump: ' + PumpName, 1, MaxStrLen(SalesLine."Description 2"));
         SalesLine.Modify(true);
+        exit(SalesLine."Line No.");
     end;
 
     // Posts the documents if Auto-Post is on, then says what was done
-    local procedure Finish(CreatedDocs: List of [Code[20]])
+    local procedure Finish(CreatedDocs: List of [Code[20]]; RowCount: Integer)
     var
         Setup: Record "E-Pump Setup Table";
         SalesHeader: Record "Sales Header";
@@ -189,11 +232,11 @@ codeunit 52104 "E-Pump Sales Convert"
     begin
         Setup.Get();
         if not Setup."Auto-Post" then begin
-            Message('%1 sales document(s) created.', CreatedDocs.Count());
+            Message('%1 row(s) converted into %2 sales document(s).', RowCount, CreatedDocs.Count());
             exit;
         end;
 
-        // Save the new documents before posting, so a posting error does not undo them
+        // Save the new documents and the ticks before posting, so a posting error does not undo them
         Commit();
         foreach DocNo in CreatedDocs do begin
             SalesHeader.SetFilter("Document Type", '%1|%2', SalesHeader."Document Type"::Invoice, SalesHeader."Document Type"::Order);
@@ -203,6 +246,6 @@ codeunit 52104 "E-Pump Sales Convert"
             SalesHeader.Invoice := true;
             Codeunit.Run(Codeunit::"Sales-Post", SalesHeader);
         end;
-        Message('%1 sales document(s) created and posted.', CreatedDocs.Count());
+        Message('%1 row(s) converted into %2 sales document(s), all posted.', RowCount, CreatedDocs.Count());
     end;
 }
